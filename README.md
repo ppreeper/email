@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/ppreeper/email.svg?branch=master)](https://travis-ci.org/ppreeper/email)
+[![Coverage Status](https://coveralls.io/repos/github/ppreeper/email/badge.svg?branch=master)](https://coveralls.io/github/ppreeper/email?branch=master)
 
 # email
 Library to send email messages, written in go. This library is using the standard library to make up all the moving parts in sending email messages. No external dependencies required.
