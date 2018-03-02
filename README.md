@@ -41,10 +41,6 @@ func main() {
 	server := email.SMTPServer{Host: "mail.example.com", Port: "25", STARTTLS: false}
 
 	err := server.Send(&user, &m)
-	check(err)
-}
-
-func check(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
