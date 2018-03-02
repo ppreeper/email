@@ -171,7 +171,7 @@ func (s *SMTPServer) ServerName() string {
 }
 
 // Send smtp message
-func (s *SMTPServer) Send(u *EmailUser, m *Message) error {
+func (s *SMTPServer) Send(u *User, m *Message) error {
 	var to, cc, bcc []string
 	for _, v := range m.To {
 		to = append(to, v.Address)
