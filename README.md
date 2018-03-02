@@ -4,7 +4,7 @@ library to send email messages, written in go. This library is using the standar
 ## Use
 To use the library you need to construct three parts:
 * *SMTPServer* The smtp server the message is being submitted to
-* *EmailUser* The authorized email user sending the message
+* *User* The authorized email user sending the message
 * *Message* The message that is to be constructed and sent
 
 ## Status
