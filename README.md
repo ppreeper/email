@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/ppreeper/email.svg?branch=master)](https://travis-ci.org/ppreeper/email)
+
 # email
 Library to send email messages, written in go. This library is using the standard library to make up all the moving parts in sending email messages. No external dependencies required.
 
