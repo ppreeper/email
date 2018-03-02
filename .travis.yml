@@ -45,3 +45,7 @@ script:
   #- megacheck ./...                          # "go vet on steroids" + linter
   #- gocyclo -over 19 $GO_FILES               # forbid code with huge functions
   - golint -set_exit_status $(go list ./...) # one last linter
+ 
+ # after success run coveralls
+ after_success:
+    coveralls
