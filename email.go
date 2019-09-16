@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"mime"
 	"net/mail"
@@ -195,23 +196,41 @@ func (s *SMTPServer) Send(u *User, m *Message) error {
 		// Auth
 		// err = c.Auth(auth)
 		if len(to) > 0 {
-			smtp.SendMail(s.ServerName(), auth, m.From.Address, to, m.BuildMessage())
+			err := smtp.SendMail(s.ServerName(), auth, m.From.Address, to, m.BuildMessage())
+			if err != nil {
+				log.Printf("err: %v", err)
+			}
 		}
 		if len(cc) > 0 {
-			smtp.SendMail(s.ServerName(), auth, m.From.Address, cc, m.BuildMessage())
+			err := smtp.SendMail(s.ServerName(), auth, m.From.Address, cc, m.BuildMessage())
+			if err != nil {
+				log.Printf("err: %v", err)
+			}
 		}
 		if len(bcc) > 0 {
-			smtp.SendMail(s.ServerName(), auth, m.From.Address, bcc, m.BuildMessage())
+			err := smtp.SendMail(s.ServerName(), auth, m.From.Address, bcc, m.BuildMessage())
+			if err != nil {
+				log.Printf("err: %v", err)
+			}
 		}
 	} else {
 		if len(to) > 0 {
-			smtp.SendMail(s.ServerName(), nil, m.From.Address, to, m.BuildMessage())
+			err := smtp.SendMail(s.ServerName(), nil, m.From.Address, to, m.BuildMessage())
+			if err != nil {
+				log.Printf("err: %v", err)
+			}
 		}
 		if len(cc) > 0 {
-			smtp.SendMail(s.ServerName(), nil, m.From.Address, cc, m.BuildMessage())
+			err := smtp.SendMail(s.ServerName(), nil, m.From.Address, cc, m.BuildMessage())
+			if err != nil {
+				log.Printf("err: %v", err)
+			}
 		}
 		if len(bcc) > 0 {
-			smtp.SendMail(s.ServerName(), nil, m.From.Address, bcc, m.BuildMessage())
+			err := smtp.SendMail(s.ServerName(), nil, m.From.Address, bcc, m.BuildMessage())
+			if err != nil {
+				log.Printf("err: %v", err)
+			}
 		}
 	}
 
