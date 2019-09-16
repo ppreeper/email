@@ -187,54 +187,28 @@ func (s *SMTPServer) Send(u *User, m *Message) error {
 	for _, v := range m.Bcc {
 		bcc = append(bcc, v.Address)
 	}
-	if s.STARTTLS {
-		// auth := smtp.PlainAuth("", u.Username, u.Password, s.Host)
-		// config
-		// tlsconfig := &tls.Config{
-		// 	InsecureSkipVerify: true,
-		// 	ServerName:         host,
-		// }
-
-		// c.StartTLS(tlsconfig)
-
-		// Auth
-		// err = c.Auth(auth)
-		if len(to) > 0 {
-			err := s.SendMail(s.ServerName(), m.From.Address, to, m.BuildMessage())
-			if err != nil {
-				log.Printf("err: %v", err)
-			}
-		}
-		if len(cc) > 0 {
-			err := s.SendMail(s.ServerName(), m.From.Address, cc, m.BuildMessage())
-			if err != nil {
-				log.Printf("err: %v", err)
-			}
-		}
-		if len(bcc) > 0 {
-			err := s.SendMail(s.ServerName(), m.From.Address, bcc, m.BuildMessage())
-			if err != nil {
-				log.Printf("err: %v", err)
-			}
-		}
+	var auth Auth
+	if u.Auth {
+		auth = PlainAuth("", u.Username, u.Password, s.Host)
 	} else {
-		if len(to) > 0 {
-			err := s.SendMail(s.ServerName(), m.From.Address, to, m.BuildMessage())
-			if err != nil {
-				log.Printf("err: %v", err)
-			}
+		auth = nil
+	}
+	if len(to) > 0 {
+		err := s.SendMail(s.ServerName(), auth, m.From.Address, to, m.BuildMessage())
+		if err != nil {
+			log.Printf("err: %v", err)
 		}
-		if len(cc) > 0 {
-			err := s.SendMail(s.ServerName(), m.From.Address, cc, m.BuildMessage())
-			if err != nil {
-				log.Printf("err: %v", err)
-			}
+	}
+	if len(cc) > 0 {
+		err := s.SendMail(s.ServerName(), auth, m.From.Address, cc, m.BuildMessage())
+		if err != nil {
+			log.Printf("err: %v", err)
 		}
-		if len(bcc) > 0 {
-			err := s.SendMail(s.ServerName(), m.From.Address, bcc, m.BuildMessage())
-			if err != nil {
-				log.Printf("err: %v", err)
-			}
+	}
+	if len(bcc) > 0 {
+		err := s.SendMail(s.ServerName(), auth, m.From.Address, bcc, m.BuildMessage())
+		if err != nil {
+			log.Printf("err: %v", err)
 		}
 	}
 
@@ -261,7 +235,7 @@ func (s *SMTPServer) Send(u *User, m *Message) error {
 // attachments (see the mime/multipart package), or other mail
 // functionality. Higher-level packages exist outside of the standard
 // library.
-func (s *SMTPServer) SendMail(addr string, from string, to []string, msg []byte) error {
+func (s *SMTPServer) SendMail(addr string, a Auth, from string, to []string, msg []byte) error {
 	if err := validateLine(from); err != nil {
 		return err
 	}
