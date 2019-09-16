@@ -194,13 +194,25 @@ func (s *SMTPServer) Send(u *User, m *Message) error {
 
 		// Auth
 		// err = c.Auth(auth)
-		smtp.SendMail(s.ServerName(), auth, m.From.Address, to, m.BuildMessage())
-		smtp.SendMail(s.ServerName(), auth, m.From.Address, cc, m.BuildMessage())
-		smtp.SendMail(s.ServerName(), auth, m.From.Address, bcc, m.BuildMessage())
+		if len(to) > 0 {
+			smtp.SendMail(s.ServerName(), auth, m.From.Address, to, m.BuildMessage())
+		}
+		if len(cc) > 0 {
+			smtp.SendMail(s.ServerName(), auth, m.From.Address, cc, m.BuildMessage())
+		}
+		if len(bcc) > 0 {
+			smtp.SendMail(s.ServerName(), auth, m.From.Address, bcc, m.BuildMessage())
+		}
 	} else {
-		smtp.SendMail(s.ServerName(), nil, m.From.Address, to, m.BuildMessage())
-		smtp.SendMail(s.ServerName(), nil, m.From.Address, cc, m.BuildMessage())
-		smtp.SendMail(s.ServerName(), nil, m.From.Address, bcc, m.BuildMessage())
+		if len(to) > 0 {
+			smtp.SendMail(s.ServerName(), nil, m.From.Address, to, m.BuildMessage())
+		}
+		if len(cc) > 0 {
+			smtp.SendMail(s.ServerName(), nil, m.From.Address, cc, m.BuildMessage())
+		}
+		if len(bcc) > 0 {
+			smtp.SendMail(s.ServerName(), nil, m.From.Address, bcc, m.BuildMessage())
+		}
 	}
 
 	return nil
