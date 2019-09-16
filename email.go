@@ -3,7 +3,6 @@ package email
 import (
 	"bytes"
 	"crypto/sha1"
-	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -177,6 +176,24 @@ func (s *SMTPServer) ServerName() string {
 
 // Send smtp message
 func (s *SMTPServer) Send(u *User, m *Message) error {
+	if err := validateLine(m.From.String()); err != nil {
+		return err
+	}
+	for _, recp := range m.To {
+		if err := validateLine(recp.String()); err != nil {
+			return err
+		}
+	}
+	for _, recp := range m.Cc {
+		if err := validateLine(recp.String()); err != nil {
+			return err
+		}
+	}
+	for _, recp := range m.Bcc {
+		if err := validateLine(recp.String()); err != nil {
+			return err
+		}
+	}
 	var to, cc, bcc []string
 	for _, v := range m.To {
 		to = append(to, v.Address)
@@ -187,26 +204,26 @@ func (s *SMTPServer) Send(u *User, m *Message) error {
 	for _, v := range m.Bcc {
 		bcc = append(bcc, v.Address)
 	}
-	var auth Auth
-	if u.Auth {
-		auth = PlainAuth("", u.Username, u.Password, s.Host)
-	} else {
-		auth = nil
-	}
+	// var auth Auth
+	// if u.Auth {
+	// 	auth = PlainAuth("", u.Username, u.Password, s.Host)
+	// } else {
+	// 	auth = nil
+	// }
 	if len(to) > 0 {
-		err := s.SendMail(s.ServerName(), auth, m.From.Address, to, m.BuildMessage())
+		err := s.SendMail(s.ServerName(), m.From.String(), to, m.BuildMessage())
 		if err != nil {
-			log.Printf("err: %v", err)
+			return err
 		}
 	}
 	if len(cc) > 0 {
-		err := s.SendMail(s.ServerName(), auth, m.From.Address, cc, m.BuildMessage())
+		err := s.SendMail(s.ServerName(), m.From.String(), to, m.BuildMessage())
 		if err != nil {
 			log.Printf("err: %v", err)
 		}
 	}
 	if len(bcc) > 0 {
-		err := s.SendMail(s.ServerName(), auth, m.From.Address, bcc, m.BuildMessage())
+		err := s.SendMail(s.ServerName(), m.From.Address, bcc, m.BuildMessage())
 		if err != nil {
 			log.Printf("err: %v", err)
 		}
@@ -215,63 +232,13 @@ func (s *SMTPServer) Send(u *User, m *Message) error {
 	return nil
 }
 
-// SendMail connects to the server at addr, switches to TLS if
-// possible, authenticates with the optional mechanism a if possible,
-// and then sends an email from address from, to addresses to, with
-// message msg.
-// The addr must include a port, as in "mail.example.com:smtp".
-//
-// The addresses in the to parameter are the SMTP RCPT addresses.
-//
-// The msg parameter should be an RFC 822-style email with headers
-// first, a blank line, and then the message body. The lines of msg
-// should be CRLF terminated. The msg headers should usually include
-// fields such as "From", "To", "Subject", and "Cc".  Sending "Bcc"
-// messages is accomplished by including an email address in the to
-// parameter but not including it in the msg headers.
-//
-// The SendMail function and the net/smtp package are low-level
-// mechanisms and provide no support for DKIM signing, MIME
-// attachments (see the mime/multipart package), or other mail
-// functionality. Higher-level packages exist outside of the standard
-// library.
-func (s *SMTPServer) SendMail(addr string, a Auth, from string, to []string, msg []byte) error {
-	if err := validateLine(from); err != nil {
-		return err
-	}
-	for _, recp := range to {
-		if err := validateLine(recp); err != nil {
-			return err
-		}
-	}
-	c, err := smtp.Dial(addr)
+// SendMail requires no tls
+func (s *SMTPServer) SendMail(serverName, from string, to []string, msg []byte) error {
+	c, err := smtp.Dial(serverName)
 	if err != nil {
 		return err
 	}
 	defer c.Close()
-	// if err = c.hello(); err != nil {
-	// 	return err
-	// }
-	if s.STARTTLS {
-		if ok, _ := c.Extension("STARTTLS"); ok {
-			config := &tls.Config{ServerName: s.Host}
-			fmt.Println(config)
-			if testHookStartTLS != nil {
-				testHookStartTLS(config)
-			}
-			if err = c.StartTLS(config); err != nil {
-				return err
-			}
-		}
-	}
-	// if a != nil && c.ext != nil {
-	// 	if _, ok := c.ext["AUTH"]; !ok {
-	// 		return errors.New("smtp: server doesn't support AUTH")
-	// 	}
-	// 	if err = c.Auth(a); err != nil {
-	// 		return err
-	// 	}
-	// }
 	if err = c.Mail(from); err != nil {
 		return err
 	}
@@ -294,8 +261,6 @@ func (s *SMTPServer) SendMail(addr string, a Auth, from string, to []string, msg
 	}
 	return c.Quit()
 }
-
-var testHookStartTLS func(*tls.Config) // nil, except for tests
 
 // validateLine checks to see if a line has CR or LF as per RFC 5321
 func validateLine(line string) error {
