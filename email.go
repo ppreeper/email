@@ -3,6 +3,7 @@ package email
 import (
 	"bytes"
 	"crypto/sha1"
+	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -211,19 +212,19 @@ func (s *SMTPServer) Send(u *User, m *Message) error {
 	// 	auth = nil
 	// }
 	if len(to) > 0 {
-		err := s.SendMail(s.ServerName(), m.From.String(), to, m.BuildMessage())
+		err := s.SendMail(*u, m.From.String(), to, m.BuildMessage())
 		if err != nil {
 			return err
 		}
 	}
 	if len(cc) > 0 {
-		err := s.SendMail(s.ServerName(), m.From.String(), to, m.BuildMessage())
+		err := s.SendMail(*u, m.From.String(), to, m.BuildMessage())
 		if err != nil {
 			log.Printf("err: %v", err)
 		}
 	}
 	if len(bcc) > 0 {
-		err := s.SendMail(s.ServerName(), m.From.Address, bcc, m.BuildMessage())
+		err := s.SendMail(*u, m.From.Address, bcc, m.BuildMessage())
 		if err != nil {
 			log.Printf("err: %v", err)
 		}
@@ -233,12 +234,28 @@ func (s *SMTPServer) Send(u *User, m *Message) error {
 }
 
 // SendMail requires no tls
-func (s *SMTPServer) SendMail(serverName, from string, to []string, msg []byte) error {
-	c, err := smtp.Dial(serverName)
+func (s *SMTPServer) SendMail(user User, from string, to []string, msg []byte) error {
+	tlsconfig := &tls.Config{
+		ServerName: s.ServerName(),
+	}
+	conn, err := tls.Dial("tcp", s.ServerName(), tlsconfig)
+	if err != nil {
+		return err
+	}
+	c, err := smtp.NewClient(conn, s.Host)
 	if err != nil {
 		return err
 	}
 	defer c.Close()
+
+	// Auth
+	if user.Auth {
+		auth := smtp.PlainAuth("", user.Username, user.Password, s.Host)
+		if err = c.Auth(auth); err != nil {
+			return err
+		}
+	}
+	// To and From
 	if err = c.Mail(from); err != nil {
 		return err
 	}
@@ -247,6 +264,7 @@ func (s *SMTPServer) SendMail(serverName, from string, to []string, msg []byte) 
 			return err
 		}
 	}
+	// Data
 	w, err := c.Data()
 	if err != nil {
 		return err
