@@ -1,14 +1,16 @@
-[![Build Status](https://travis-ci.org/ppreeper/email.svg?branch=master)](https://travis-ci.org/ppreeper/email)
-[![Coverage Status](https://coveralls.io/repos/github/ppreeper/email/badge.svg?branch=master)](https://coveralls.io/github/ppreeper/email?branch=master)
+[![Build Status](https://drone.preeper.org/api/badges/ppreeper/dbtools/status.svg)](https://drone.preeper.org/ppreeper/dbtools)
 
 # email
+
 Library to send email messages, written in go. This library is using the standard library to make up all the moving parts in sending email messages. No external dependencies required.
 
 ## Use
+
 To use the library you need to construct three parts:
-* **SMTPServer** The smtp server the message is being submitted to
-* **User** The authorized email user sending the message
-* **Message** The message that is to be constructed and sent
+
+- **SMTPServer** The smtp server the message is being submitted to
+- **User** The authorized email user sending the message
+- **Message** The message that is to be constructed and sent
 
 ```go
 package main
@@ -38,7 +40,7 @@ func main() {
 	}
 	m.Attachments = make(map[string]*email.Attachment)
 	m.Attachments["test.txt"] = &d
-  
+
 	// Connect to the remote SMTP server.
 	user := email.User{Username: "mailer@example.com", Password: "pa55w0rd"}
 	server := email.SMTPServer{Host: "mail.example.com", Port: "25", STARTTLS: false}
@@ -51,8 +53,5 @@ func main() {
 ```
 
 ## Status
-This library is a work in progress but has been tested against a MS Exchange server and a Postfix server configured with starttls.
 
-## Issues
-* bcc not functioning as expected
-* testing on exchange did not send messages outside of organization, but postfix worked sending to internal/external recipients
+This library is a work in progress but has been tested against a MS Exchange server and a Postfix server configured with starttls.
