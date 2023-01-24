@@ -41,6 +41,45 @@ type Message struct {
 	Attachments map[string]*Attachment
 }
 
+func addressesToString(Addresses []mail.Address) string {
+	addrs := []string{}
+	for _, v := range Addresses {
+		addrs = append(addrs, fmt.Sprintf("%s <%s>", v.Name, v.Address))
+	}
+	addressString := strings.Join(addrs, ",")
+	return addressString
+}
+
+func (m *Message) Headers() []byte {
+	buf := bytes.NewBuffer(nil)
+
+	// Setup headers
+	t := time.Now()
+	headers := make(map[string]string)
+	headers["From"] = fmt.Sprintf("%s <%s>", m.From.Name, m.From.Address)
+	headers["Date"] = t.Format(time.RFC1123Z)
+	headers["To"] = addressesToString(m.To)
+
+	if len(m.Cc) > 0 {
+		headers["Cc"] = addressesToString(m.Cc)
+	}
+	if len(m.Bcc) > 0 {
+		headers["Bcc"] = addressesToString(m.Bcc)
+	}
+	if m.ReplyTo.Address != "" {
+		headers["Reply-To"] = fmt.Sprintf("%s <%s>", m.ReplyTo.Name, m.ReplyTo.Address)
+	}
+	headers["Subject"] = "=?UTF-8?B?" + coder.EncodeToString([]byte(m.Subject)) + "?="
+
+	for k, v := range headers {
+		buf.WriteString(k + ": " + v + "\r\n")
+	}
+
+	buf.WriteString("MIME-Version: 1.0\r\n")
+
+	return buf.Bytes()
+}
+
 // Attach file to SMTP Message
 func (m *Message) Attach(file string, inline bool) error {
 	_, filename := filepath.Split(file)
@@ -59,7 +98,6 @@ func (m *Message) Attach(file string, inline bool) error {
 
 // BuildMessage returns byte ready email file
 func (m *Message) BuildMessage() []byte {
-	t := time.Now()
 	buf := bytes.NewBuffer(nil)
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -68,51 +106,28 @@ func (m *Message) BuildMessage() []byte {
 	boundary := coder.EncodeToString(digest[:])
 
 	// Setup headers
-	headers := make(map[string]string)
-	headers["From"] = fmt.Sprintf("%s <%s>", m.From.Name, m.From.Address)
-	headers["Date"] = fmt.Sprintf("%s", t.Format(time.RFC1123Z))
-	var hdr string
-	for i := 0; i < len(m.To); i++ {
-		if i == len(m.To)-1 {
-			hdr += fmt.Sprintf(m.To[i].Name + " <" + m.To[i].Address + ">")
-		} else {
-			hdr += fmt.Sprintf(m.To[i].Name + " <" + m.To[i].Address + ">,")
-		}
-	}
-	headers["To"] = hdr
+	// t := time.Now()
+	// headers := make(map[string]string)
+	// headers["From"] = fmt.Sprintf("%s <%s>", m.From.Name, m.From.Address)
+	// headers["Date"] = t.Format(time.RFC1123Z)
+	// headers["To"] = addressesToString(m.To)
 
-	if len(m.Cc) > 0 {
-		hdr = ""
-		for i := 0; i < len(m.Cc); i++ {
-			if i == len(m.Cc)-1 {
-				hdr += fmt.Sprintf(m.Cc[i].Name + " <" + m.Cc[i].Address + ">")
-			} else {
-				hdr += fmt.Sprintf(m.Cc[i].Name + " <" + m.Cc[i].Address + ">,")
-			}
-		}
-		headers["Cc"] = hdr
-	}
-	if len(m.Bcc) > 0 {
-		hdr = ""
-		for i := 0; i < len(m.Bcc); i++ {
-			if i == len(m.Bcc)-1 {
-				hdr += fmt.Sprintf(m.Bcc[i].Name + " <" + m.Bcc[i].Address + ">")
-			} else {
-				hdr += fmt.Sprintf(m.Bcc[i].Name + " <" + m.Bcc[i].Address + ">,")
-			}
-		}
-		headers["Bcc"] = hdr
-	}
-	if m.ReplyTo.Address != "" {
-		headers["Reply-To"] = fmt.Sprintf("%s <%s>", m.ReplyTo.Name, m.ReplyTo.Address)
-	}
-	headers["Subject"] = "=?UTF-8?B?" + coder.EncodeToString([]byte(m.Subject)) + "?="
+	// if len(m.Cc) > 0 {
+	// 	headers["Cc"] = addressesToString(m.Cc)
+	// }
+	// if len(m.Bcc) > 0 {
+	// 	headers["Bcc"] = addressesToString(m.Bcc)
+	// }
+	// if m.ReplyTo.Address != "" {
+	// 	headers["Reply-To"] = fmt.Sprintf("%s <%s>", m.ReplyTo.Name, m.ReplyTo.Address)
+	// }
+	// headers["Subject"] = "=?UTF-8?B?" + coder.EncodeToString([]byte(m.Subject)) + "?="
 
 	// Setup message = headers + body
-	for k, v := range headers {
-		buf.WriteString(k + ": " + v + "\r\n")
-	}
-	buf.WriteString("MIME-Version: 1.0\r\n")
+	// for k, v := range headers {
+	// 	buf.WriteString(k + ": " + v + "\r\n")
+	// }
+	buf.Write(m.Headers())
 
 	if len(m.Attachments) > 0 {
 		buf.WriteString("Content-Type: multipart/mixed; boundary=" + boundary + "\r\n")
