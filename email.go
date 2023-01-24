@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -44,38 +43,95 @@ type Message struct {
 func addressesToString(Addresses []mail.Address) string {
 	addrs := []string{}
 	for _, v := range Addresses {
-		addrs = append(addrs, fmt.Sprintf("%s <%s>", v.Name, v.Address))
+		if len(v.Name) == 0 {
+			addrs = append(addrs, v.Address)
+		} else {
+			addrs = append(addrs, v.Name+" <"+v.Address+">")
+		}
 	}
 	addressString := strings.Join(addrs, ",")
 	return addressString
 }
 
-func (m *Message) Headers() []byte {
+func (m *Message) GenHeader() []byte {
 	buf := bytes.NewBuffer(nil)
 
 	// Setup headers
 	t := time.Now()
-	headers := make(map[string]string)
-	headers["From"] = fmt.Sprintf("%s <%s>", m.From.Name, m.From.Address)
-	headers["Date"] = t.Format(time.RFC1123Z)
-	headers["To"] = addressesToString(m.To)
 
+	buf.WriteString("Date: " + t.Format(time.RFC1123Z) + "\r\n")
+	buf.WriteString("From: " + addressesToString([]mail.Address{{Name: m.From.Name, Address: m.From.Address}}) + "\r\n")
+	if m.ReplyTo.Address != "" {
+		buf.WriteString("Reply-To: " + addressesToString([]mail.Address{{Name: m.ReplyTo.Name, Address: m.ReplyTo.Address}}) + "\r\n")
+	}
+	buf.WriteString("To: " + addressesToString(m.To) + "\r\n")
 	if len(m.Cc) > 0 {
-		headers["Cc"] = addressesToString(m.Cc)
+		buf.WriteString("Cc: " + addressesToString(m.Cc) + "\r\n")
 	}
 	if len(m.Bcc) > 0 {
-		headers["Bcc"] = addressesToString(m.Bcc)
+		buf.WriteString("Bcc: " + addressesToString(m.Bcc) + "\r\n")
 	}
-	if m.ReplyTo.Address != "" {
-		headers["Reply-To"] = fmt.Sprintf("%s <%s>", m.ReplyTo.Name, m.ReplyTo.Address)
-	}
-	headers["Subject"] = "=?UTF-8?B?" + coder.EncodeToString([]byte(m.Subject)) + "?="
-
-	for k, v := range headers {
-		buf.WriteString(k + ": " + v + "\r\n")
-	}
-
+	buf.WriteString("Subject: =?UTF-8?B?" + coder.EncodeToString([]byte(m.Subject)) + "?=\r\n")
 	buf.WriteString("MIME-Version: 1.0\r\n")
+
+	return buf.Bytes()
+}
+
+func (m *Message) GenBody() []byte {
+	buf := bytes.NewBuffer(nil)
+
+	if m.MimeType == "" {
+		m.MimeType = "text/plain"
+	}
+	buf.WriteString("Content-Type: " + m.MimeType + "; charset=utf-8\r\n\r\n")
+	buf.WriteString(m.Body + "\r\n")
+
+	return buf.Bytes()
+}
+
+func (m *Message) GenMixedMessage(boundary string) []byte {
+	buf := bytes.NewBuffer(nil)
+
+	if len(m.Attachments) > 0 {
+		buf.WriteString("Content-Type: multipart/mixed; boundary=" + boundary + "\r\n")
+		buf.WriteString("\r\n--" + boundary + "\r\n")
+	}
+
+	return buf.Bytes()
+}
+
+func (m *Message) GenAttachment(boundary string) []byte {
+	buf := bytes.NewBuffer(nil)
+
+	if len(m.Attachments) > 0 {
+		for _, f := range m.Attachments {
+			buf.WriteString("\r\n\r\n--" + boundary)
+			if f.Inline {
+				buf.WriteString("\r\nContent-Type: message/rfc822\r\n")
+				buf.WriteString("Content-Disposition: inline; filename=\"" + f.Filename + "\"\r\n\r\n")
+				buf.Write(f.Data)
+				buf.WriteString("\r\n--" + boundary)
+			} else {
+				mimetype := mime.TypeByExtension(filepath.Ext(f.Filename))
+				if mimetype != "" {
+					buf.WriteString("\r\nContent-Type: " + mimetype + "\r\n")
+				} else {
+					buf.WriteString("\r\nContent-Type: application/octet-stream\r\n")
+				}
+				buf.WriteString("Content-Transfer-Encoding: base64\r\n")
+				buf.WriteString("Content-Disposition: attachment; filename=\"" + "=?UTF-8?B?" + coder.EncodeToString([]byte(f.Filename)) + "?=" + "\"\r\n\r\n")
+				b := make([]byte, base64.StdEncoding.EncodedLen(len(f.Data)))
+				base64.StdEncoding.Encode(b, f.Data)
+				for i, l := 0, len(b); i < l; i++ {
+					buf.WriteByte(b[i])
+					if (i+1)%76 == 0 {
+						buf.WriteString("\r\n")
+					}
+				}
+			}
+		}
+		buf.WriteString("\r\n--" + boundary + "--")
+	}
 
 	return buf.Bytes()
 }
@@ -105,68 +161,13 @@ func (m *Message) BuildMessage() []byte {
 	digest := sha1.Sum([]byte(datarand))
 	boundary := coder.EncodeToString(digest[:])
 
-	// Setup headers
-	// t := time.Now()
-	// headers := make(map[string]string)
-	// headers["From"] = fmt.Sprintf("%s <%s>", m.From.Name, m.From.Address)
-	// headers["Date"] = t.Format(time.RFC1123Z)
-	// headers["To"] = addressesToString(m.To)
+	buf.Write(m.GenHeader())
 
-	// if len(m.Cc) > 0 {
-	// 	headers["Cc"] = addressesToString(m.Cc)
-	// }
-	// if len(m.Bcc) > 0 {
-	// 	headers["Bcc"] = addressesToString(m.Bcc)
-	// }
-	// if m.ReplyTo.Address != "" {
-	// 	headers["Reply-To"] = fmt.Sprintf("%s <%s>", m.ReplyTo.Name, m.ReplyTo.Address)
-	// }
-	// headers["Subject"] = "=?UTF-8?B?" + coder.EncodeToString([]byte(m.Subject)) + "?="
+	buf.Write(m.GenMixedMessage(boundary))
 
-	// Setup message = headers + body
-	// for k, v := range headers {
-	// 	buf.WriteString(k + ": " + v + "\r\n")
-	// }
-	buf.Write(m.Headers())
+	buf.Write(m.GenBody())
 
-	if len(m.Attachments) > 0 {
-		buf.WriteString("Content-Type: multipart/mixed; boundary=" + boundary + "\r\n")
-		buf.WriteString("\r\n--" + boundary + "\r\n")
-	}
-	// Body text
-	buf.WriteString("Content-Type: " + m.MimeType + "; charset=utf-8\r\n\r\n")
-	buf.WriteString(m.Body + "\r\n")
-
-	if len(m.Attachments) > 0 {
-		for _, f := range m.Attachments {
-			buf.WriteString("\r\n\r\n--" + boundary)
-			if f.Inline {
-				buf.WriteString("\r\nContent-Type: message/rfc822\r\n")
-				buf.WriteString("Content-Disposition: inline; filename=\"" + f.Filename + "\"\r\n\r\n")
-				buf.Write(f.Data)
-				buf.WriteString("\r\n--" + boundary)
-			} else {
-				mimetype := mime.TypeByExtension(filepath.Ext(f.Filename))
-				if mimetype != "" {
-					buf.WriteString("\r\nContent-Type: " + mimetype + "\r\n")
-				} else {
-					buf.WriteString("\r\nContent-Type: application/octet-stream\r\n")
-				}
-				buf.WriteString("Content-Transfer-Encoding: base64\r\n")
-				buf.WriteString("Content-Disposition: attachment; filename=\"" + "=?UTF-8?B?" + coder.EncodeToString([]byte(f.Filename)) + "?=" + "\"\r\n\r\n")
-				b := make([]byte, base64.StdEncoding.EncodedLen(len(f.Data)))
-				base64.StdEncoding.Encode(b, f.Data)
-				for i, l := 0, len(b); i < l; i++ {
-					buf.WriteByte(b[i])
-					if (i+1)%76 == 0 {
-						buf.WriteString("\r\n")
-					}
-				}
-			}
-		}
-		buf.WriteString("\r\n--" + boundary)
-		buf.WriteString("--")
-	}
+	buf.Write(m.GenAttachment(boundary))
 
 	return buf.Bytes()
 }
